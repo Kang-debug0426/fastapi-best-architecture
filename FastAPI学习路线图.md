@@ -1,307 +1,403 @@
-# FastAPI 后端源码拆解与实战路线图
+# 后端系统从零长出来的过程
 
-## 推荐项目
-
-### 首选：fastapi-practices/fastapi_best_architecture
-
-**仓库地址**：https://github.com/fastapi-practices/fastapi_best_architecture
-
-| 需求 | 匹配度 |
-|------|--------|
-| FastAPI + MySQL + Redis + Docker | 全部满足，SQLAlchemy 2.0 + Pydantic V2 |
-| 规范的分层架构 | 伪三层架构：`api(router)` → `service` → `crud/model` |
-| docker-compose 一键拉起 | 完整 `docker-compose.yml`，含 MySQL、Redis、Celery |
-| 适合作为 AI 后端模板 | 架构清晰、模块解耦，后续加 LLM 接口非常自然 |
-
-**额外加分项**：
-- 内置 RBAC 权限管理、JWT 认证、Celery 异步任务
-- 中文文档和社区，遇到问题容易找到帮助
-- 使用 Alembic 做数据库迁移（生产级标配）
-- 有配套前端 UI 仓库（可选）
-
-### 备选：fastapi-practices/fastapi_sqlalchemy_mysql
-
-**仓库地址**：https://github.com/fastapi-practices/fastapi_sqlalchemy_mysql
-
-同一组织下的**精简版脚手架**，技术栈相同（FastAPI + Pydantic V2 + SQLAlchemy 2.0 + Alembic + MySQL + Redis），功能更少、代码量更小。如果主项目一开始太复杂，可先花 1-2 天看这个精简版理解基本骨架，再切到完整版。
+> 不是 FastAPI 功能清单。
+> 是一个真实后端系统，一层层演化出来的过程。
 
 ---
 
-## 实战学习路线（每天 5-8 小时，共 12 天）
+## 学习结构（必须理解）
 
----
-
-### Day 1：环境拉起 + 项目全貌
-
-**目标**：跑通项目，打开 Swagger 文档页面
-
-**动作**：
-1. `git clone` 项目，通读根目录的 `README.md` 和 `docker-compose.yml`
-2. 理解 compose 中定义了哪些服务（app、mysql、redis、celery worker）
-3. 执行 `docker-compose up -d` 拉起全部服务
-4. 浏览器访问 `http://localhost:8000/docs`，确认 Swagger UI 正常加载
-5. 用 Swagger 手动调几个接口（如登录、获取用户列表），建立直觉
-
-**重点文件**：
-- `docker-compose.yml` — 服务编排
-- `.env` 或 `core/conf.py` — 配置管理方式
-- `main.py` 或 `app.py` — 应用入口
-
----
-
-### Day 2：项目结构与路由分发
-
-**目标**：搞清楚一个请求从 URL 到函数的完整路径
-
-**动作**：
-1. 画出项目目录树，标注每个文件夹的职责
-2. 从 `main.py` 出发，找到 `app = FastAPI()` 和路由注册的位置
-3. 追踪一个具体路由（如 `/api/v1/auth/login`），看它如何通过 `APIRouter` → `include_router` 层层挂载
-4. 阅读 2-3 个 router 文件，总结路由定义的模式
-
-**核心概念**：
-- `APIRouter` 的 `prefix` 和 `tags` 参数
-- 路由文件的组织方式（按业务模块分文件）
-- `__init__.py` 中的路由汇总注册
-
----
-
-### Day 3：Pydantic 数据校验 + 响应模型
-
-**目标**：理解请求/响应数据如何被自动校验和序列化
-
-**动作**：
-1. 找到 `schema`（或 `schemas`）目录，阅读 3-4 个 schema 文件
-2. 对比「请求 Schema」和「响应 Schema」的区别
-3. 看路由函数的参数类型标注如何与 Schema 绑定
-4. 在 Swagger 中故意传错误数据，观察 422 校验错误的返回格式
-5. 自己仿写一个新的 Schema，体会 `Field`、`validator`、`model_config` 的用法
-
-**核心概念**：
-- `BaseModel` 继承与字段定义
-- `Field(...)` 的校验参数（min_length、ge、regex 等）
-- 响应模型 `response_model` 的作用
-
----
-
-### Day 4：依赖注入（Depends）
-
-**目标**：理解 FastAPI 最核心的设计模式
-
-**动作**：
-1. 全局搜索 `Depends(`，收集项目中所有依赖注入的用法
-2. 分类整理：
-   - 获取数据库 Session 的依赖（`get_db`）
-   - 获取当前用户的依赖（`get_current_user`）
-   - 权限校验的依赖
-3. 追踪一个需要登录的接口，看 `Depends` 链如何层层嵌套
-4. 自己写一个简单的依赖（如：从 Header 中提取自定义 token）
-
-**核心概念**：
-- 依赖函数 vs 依赖类
-- 依赖的嵌套组合
-- `yield` 依赖（用于数据库 session 的生命周期管理）
-
----
-
-### Day 5：SQLAlchemy ORM + CRUD 层
-
-**目标**：掌握数据库操作的完整链路
-
-**动作**：
-1. 找到 `model` 目录，阅读 2-3 个数据模型定义（表结构）
-2. 找到 `crud` 目录，看基础 CRUD 类如何封装 `session.query` / `session.execute`
-3. 追踪一个完整的写操作（如创建用户）：`router → service → crud → model → DB`
-4. 阅读 `alembic/` 目录，理解数据库迁移的工作流
-5. 尝试自己新增一个表和对应的 CRUD
-
-**核心概念**：
-- `DeclarativeBase` 模型定义
-- `AsyncSession` 异步数据库操作
-- `select()` / `insert()` / `update()` 的 SQLAlchemy 2.0 写法
-- Alembic 的 `revision` 和 `upgrade` 命令
-
----
-
-### Day 6：Redis 缓存集成
-
-**目标**：理解 Redis 在项目中的角色和使用方式
-
-**动作**：
-1. 搜索项目中所有 `redis` 相关代码，找到 Redis 客户端的初始化位置
-2. 整理 Redis 的使用场景（Token 黑名单、接口限流、缓存热数据）
-3. 追踪一个具体的 Redis 读写流程（如 token 存储/校验）
-4. 看 Redis 连接是如何通过依赖注入或全局单例提供的
-5. 自己写一个简单的缓存逻辑：先查 Redis，miss 则查 DB 并回写
-
-**核心概念**：
-- `aioredis` / `redis-py` 异步客户端
-- Redis 连接池配置
-- Key 的命名规范和 TTL 设置
-
----
-
-### Day 7：中间件 + 异常处理 + 日志
-
-**目标**：理解请求生命周期中的横切关注点
-
-**动作**：
-1. 找到中间件注册的位置，阅读每个中间件的作用（CORS、请求日志、耗时统计等）
-2. 找到全局异常处理器，看项目如何统一错误响应格式
-3. 阅读日志配置，理解 `loguru` 或 `logging` 的集成方式
-4. 在 Swagger 中触发不同类型的错误，观察响应格式的一致性
-
-**核心概念**：
-- `@app.middleware("http")` 的执行顺序
-- `@app.exception_handler` 自定义异常
-- 统一响应格式的设计思路
-
----
-
-### Day 8：认证与权限（JWT + RBAC）
-
-**目标**：理解生产级认证系统的实现
-
-**动作**：
-1. 追踪完整的登录流程：用户名密码 → 校验 → 生成 JWT → 返回 token
-2. 追踪 token 校验流程：请求带 token → 解析 → 获取用户 → 注入到路由
-3. 阅读 RBAC 权限控制的实现（角色、菜单、权限的关联）
-4. 理解 `Depends(get_current_user)` 背后的完整逻辑链
-
-**核心概念**：
-- JWT 的签发与验证（`python-jose` 或 `PyJWT`）
-- Token 刷新机制
-- 基于角色的访问控制
-
----
-
-### Day 9：Celery 异步任务
-
-**目标**：理解耗时操作如何异步化
-
-**动作**：
-1. 找到 Celery 的配置文件和 worker 启动方式
-2. 阅读 1-2 个异步任务的定义（如发送邮件、数据导出）
-3. 看路由如何触发异步任务并返回 task_id
-4. 理解 Celery + Redis（作为 broker）的协作关系
-
-**核心概念**：
-- Celery 的 task 定义和调用
-- broker（Redis）和 backend 的角色
-- 任务状态查询
-
----
-
-### Day 10-11：AI 接口预演 — 实现流式输出接口
-
-**目标**：在现有架构下，手写一个 SSE 流式输出接口，模拟大模型的打字机效果
-
-#### Day 10 — 基础实现
-
-1. 新建路由模块 `api/v1/ai/chat.py`
-2. 实现 `StreamingResponse` 接口：
-
-```python
-from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
-import asyncio
-
-router = APIRouter(prefix="/ai", tags=["AI"])
-
-
-async def fake_llm_stream(prompt: str):
-    """模拟大模型的流式输出"""
-    response_text = f"你好！你问的是：{prompt}。这是一个模拟的流式回答，每个字会逐个输出。"
-    for char in response_text:
-        yield f"data: {char}\n\n"
-        await asyncio.sleep(0.05)
-    yield "data: [DONE]\n\n"
-
-
-@router.get("/chat/stream")
-async def chat_stream(prompt: str):
-    return StreamingResponse(
-        fake_llm_stream(prompt),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
-    )
 ```
+① sandbox/
+   最小机制验证。验证单个技术点本质。
+   跑通即止，不是长期项目。
 
-3. 将路由注册到主 app，用浏览器或 `curl` 测试流式效果
+② sandbox/ainotes/        ⭐ 主线成长层
+   AI Notes System。
+   一个真实业务系统，随着阶段一层层长出来。
+   每个中间件因业务需要而出现，不是为了学技术而硬加。
 
-#### Day 11 — 进阶整合
-
-1. 为流式接口加上认证（`Depends(get_current_user)`）
-2. 加上请求参数的 Pydantic Schema 校验
-3. 加上 Redis 对话历史缓存（存储最近 N 轮对话）
-4. 预留 `httpx` 调用外部 LLM API 的位置：
-
-```python
-import httpx
-
-
-async def real_llm_stream(prompt: str):
-    async with httpx.AsyncClient() as client:
-        async with client.stream(
-            "POST",
-            "https://api.example.com/v1/chat/completions",
-            json={
-                "model": "gpt-4",
-                "messages": [{"role": "user", "content": prompt}],
-                "stream": True,
-            },
-            headers={"Authorization": "Bearer YOUR_KEY"},
-        ) as response:
-            async for chunk in response.aiter_lines():
-                if chunk.startswith("data: "):
-                    yield chunk + "\n\n"
+③ fastapi-best-architecture/    企业对照层
+   每个阶段结束后，去这里看企业如何实现同样的事情。
+   它是"参考答案"，不是主线项目。
 ```
 
 ---
 
-### Day 12：回顾 + 自建完整模块
+## 核心视角
 
-**目标**：验证学习成果，独立完成一个完整的业务模块
+每一阶段，你都在回答同一个问题：
 
-**动作**：
-1. 不看参考，从零新增一个完整模块（如「笔记管理」）：
-   - Model（数据表）
-   - Schema（请求/响应）
-   - CRUD（数据库操作）
-   - Service（业务逻辑）
-   - Router（路由接口）
-2. 包含：分页查询、创建、更新、删除
-3. 加上 Redis 缓存热门笔记
-4. 加上权限控制（仅作者可编辑）
-5. 写完后用 Swagger 完整测试
+**"这个请求，现在到了系统的哪一层？"**
 
----
+```
+Browser / curl
+    ↓
+[阶段1] 整条链路观察（FBA）
+    ↓
+[阶段2] FastAPI 接收请求，路由分发
+    ↓
+[阶段3] 请求数据校验与转换（Pydantic）
+    ↓
+[阶段4] 认证链：JWT 解码 → Redis Session 验证
+    ↓
+[阶段5] 数据持久化：SQLAlchemy → PostgreSQL
+    ↓
+[阶段6] 缓存层：Redis 加速读取
+    ↓
+[阶段7] 异步任务：Celery → RabbitMQ → Worker
+    ↓
+[阶段8] 流式响应：SSE 打字机输出
+    ↓
+[阶段9] 企业对照：在 FBA 里加真实功能
+```
 
-## 学习节奏总览
-
-| 阶段 | 天数 | 核心产出 |
-|------|------|---------|
-| 环境 + 骨架理解 | Day 1-2 | 能跑通项目，画出架构图 |
-| 三大核心机制 | Day 3-5 | 掌握 Pydantic + Depends + SQLAlchemy |
-| 基建层 | Day 6-8 | 理解 Redis / 中间件 / 认证的生产级实现 |
-| 异步 + AI 预演 | Day 9-11 | 能独立写出流式接口 |
-| 综合实战 | Day 12 | 独立完成完整业务模块 |
-
----
-
-## 完成后的下一步
-
-12 天完成后，你将具备在 FastAPI 架构下独立开发 AI 后端接口的能力，可以直接进入：
-
-- **LangChain + FastAPI**：构建 RAG 应用后端
-- **LlamaIndex + FastAPI**：构建知识库问答系统
-- **Agent 框架 + FastAPI**：构建多工具调用的 AI Agent 服务
+每个阶段结束，你都能在这张图上多点亮一层。
 
 ---
 
-## 参考资源
+## 学习原则
 
-- [fastapi_best_architecture](https://github.com/fastapi-practices/fastapi_best_architecture)
-- [fastapi_sqlalchemy_mysql](https://github.com/fastapi-practices/fastapi_sqlalchemy_mysql)
-- [fastapi-best-practices](https://github.com/zhanymkanov/fastapi-best-practices)
-- [FastAPI 官方文档 - 大型应用结构](https://fastapi.tiangolo.com/tutorial/bigger-applications/)
+**系统先于语法**：先进容器观察真实数据，再写代码。
+
+**真实优先**：每个阶段必须连接真实组件，禁止用假数据代替。
+
+**成长优先**：ainotes 从一个文件开始，随着业务需要自然拆分，不要过早企业化。
+
+**对照学习**：每个阶段结束后去 FBA 看企业实现，理解"为什么企业要多加那些层"。
+
+**始终知道自己在哪一层**：每次写代码前，先在上面那张图里指出"我现在在操作哪个箭头"。
+
+---
+
+## 阶段 0：系统已经在跑了（✅ 完成）
+
+**你做了什么**：Docker Compose 拉起所有服务，Swagger 登录成功。
+
+**你看到了什么**：一个完整的企业后端系统，已经在你的机器上运行。
+
+**但你还不知道**：一个登录请求，是怎么从 Swagger 流经 FastAPI → JWT → Redis → PostgreSQL 的。
+
+---
+
+## 阶段 1：进入系统内部，观察真实数据流（✅ 完成）
+
+**你在系统的位置**：不是在写代码，是在观察整条链路。
+
+**你做了什么**：
+- 进入 PostgreSQL 容器，查到 sys_user 表，确认 admin 用户存在
+- Swagger 登录拿到 JWT
+- Redis 找到 `fba:token:{user_id}:{uuid}` 格式的 session key
+- DEL key 后同一 token 返回 401，验证了 JWT + Redis 协作机制
+
+**你理解了什么**：JWT 负责"你是谁"，Redis Session 负责"你现在还有没有权限"。
+
+**FBA 对照**：这就是 FBA 的认证链，你亲眼看到它运作了。
+
+---
+
+## 阶段 2：ainotes 有了第一个入口
+
+**你在系统的位置**：请求进入 FastAPI 后，如何被路由到正确的处理函数。
+
+**ainotes 这个阶段长出了什么**：
+```
+POST /notes        创建笔记（存内存 dict）
+GET  /notes        获取所有笔记
+GET  /notes/{id}   获取单条笔记
+```
+
+**目录结构**：
+```
+sandbox/ainotes/
+└── main.py        # 所有代码在这一个文件里
+```
+
+**任务清单**：
+
+**Task 2-1：最小入口**
+- [ ] 创建 `sandbox/ainotes/main.py`
+- [ ] 写 GET `/` 接口，返回 `{"status": "ainotes 运行中"}`
+- [ ] `uvicorn main:app --reload --port 8002` 跑起来
+- [ ] 访问 `/docs` 看到 Swagger
+
+**Task 2-2：笔记路由**
+- [ ] 加 POST `/notes`，接收 `{"title": "...", "content": "..."}`，存入全局 dict
+- [ ] 加 GET `/notes`，返回所有笔记
+- [ ] 加 GET `/notes/{id}`，返回单条笔记
+- [ ] 用 Swagger 测试，创建笔记后能查到
+
+**Task 2-3：FBA 对照**
+- [ ] 去 FBA 找入口文件，数一数有多少个路由，它们怎么被注册进来的
+- [ ] 对比：ainotes 一个文件，FBA 嵌套了几层 router？为什么？
+
+**完成标准**：能用 Swagger 创建笔记并查到，能说出 FBA 路由为什么要嵌套多层。
+
+**踩坑记录**：
+
+---
+
+## 阶段 3：数据在入口被校验
+
+**你在系统的位置**：请求数据进入 FastAPI 后，在到达业务逻辑之前，被校验和转换。
+
+**ainotes 这个阶段长出了什么**：
+- 笔记标题不能为空，最长 100 字
+- 内容不能为空，最长 5000 字
+- 错误数据在入口被拦截，返回 422
+
+**任务清单**：
+
+**Task 3-1：没有 Schema 会发生什么**
+- [ ] 现在用 `data: dict` 接收，故意传空 title，看接口怎么处理
+- [ ] 观察：错误数据进入业务逻辑会怎样
+
+**Task 3-2：加 Schema，错误在入口被拦截**
+- [ ] 定义 `NoteCreate(BaseModel)`，加 Field 约束
+- [ ] 同样传空 title，看 422 在哪里被拦截
+- [ ] 定义 `NoteResponse`（不含内部字段），用 `response_model` 过滤响应
+
+**Task 3-3：FBA 对照**
+- [ ] 去看 `backend/app/admin/schema/user.py`，数一数有多少个 Schema 类
+- [ ] 理解：为什么请求 Schema 和响应 Schema 要分开
+
+**完成标准**：传空 title 返回 422，能说出 Schema 在系统里扮演什么角色。
+
+**踩坑记录**：
+
+---
+
+## 阶段 4：系统知道"你是谁"
+
+**你在系统的位置**：请求如何证明自己的身份？JWT 和 Redis 为什么要配合使用？
+
+**ainotes 这个阶段长出了什么**：
+- 用户注册 / 登录接口
+- JWT + Redis Session 认证
+- 笔记属于某个用户，只有本人能看
+
+**任务清单**：
+
+**Task 4-1：只用 JWT，发现踢下线问题**
+- [ ] 加 POST `/auth/register` 和 POST `/auth/login`
+- [ ] 登录返回 JWT token
+- [ ] GET `/notes` 需要 token 才能访问
+- [ ] 思考：JWT 有效期没到，怎么让它失效？
+
+**Task 4-2：加 Redis Session，解决踢下线**
+- [ ] 登录时写 Redis session（连接 fba_redis 容器）
+- [ ] 认证时验证 Redis session
+- [ ] 加 DELETE `/auth/logout`，删 Redis key
+- [ ] 验证：logout 后同一 token 返回 401
+
+**Task 4-3：FBA 对照**
+- [ ] 去看 `backend/common/security/jwt.py`，找 JWT 生成和解码
+- [ ] 搜 `redis_client.set`，找登录时写 session 的位置
+- [ ] 对比：FBA 的认证链比你的多了什么？
+
+**完成标准**：能实现登录、认证、踢下线，能说出 JWT 和 Redis Session 各自的职责。
+
+**踩坑记录**：
+
+---
+
+## 阶段 5：数据真正活下来
+
+**你在系统的位置**：通过认证后，业务逻辑要操作数据库。
+
+**ainotes 这个阶段长出了什么**：
+- 笔记存入 PostgreSQL（连接 fba_postgres 容器）
+- 重启不丢失
+- 去掉 dict，换成真实数据库
+
+**目录结构（这时候才拆文件）**：
+```
+sandbox/ainotes/
+├── main.py
+├── database.py    # 数据库连接
+├── models.py      # SQLAlchemy 表定义
+├── schemas.py     # Pydantic Schema
+└── routers/
+    ├── auth.py
+    └── notes.py
+```
+
+**数据库表**：
+```sql
+users  (id, username, email, hashed_password, created_at)
+notes  (id, user_id, title, content, summary, created_at, updated_at)
+```
+
+**任务清单**：
+
+**Task 5-1：连上数据库**
+- [ ] `database.py`，`create_async_engine` 连接 fba_postgres
+- [ ] 执行 `SELECT 1`，确认连通
+
+**Task 5-2：定义 Model，建真实的表**
+- [ ] 定义 `User` 和 `Note` 表
+- [ ] `Base.metadata.create_all` 建表
+- [ ] 去 Navicat 看到新表
+
+**Task 5-3：CRUD 真实写入**
+- [ ] POST `/notes` → 写入 PostgreSQL → Navicat 验证数据存在
+- [ ] GET `/notes` → 从 PostgreSQL 读
+- [ ] DELETE `/notes/{id}` → Navicat 验证数据消失
+
+**Task 5-4：FBA 对照**
+- [ ] 看 `backend/app/admin/model/sys_user.py` 和 `backend/app/admin/crud/crud_user.py`
+- [ ] 对比：你把 CRUD 写在路由函数里，FBA 分了 model / crud / service 三层
+- [ ] 思考：如果业务逻辑变复杂，你的写法会出现什么问题？
+
+**完成标准**：重启 ainotes 后笔记数据还在，能说出为什么 FBA 要分三层。
+
+**踩坑记录**：
+
+---
+
+## 阶段 6：系统变快了
+
+**你在系统的位置**：数据库查询结果，在返回给客户端之前，可以被缓存起来。
+
+**ainotes 这个阶段长出了什么**：
+- 笔记列表加 Redis 缓存（连接 fba_redis 容器）
+- 写入新笔记后自动清缓存
+
+**任务清单**：
+
+**Task 6-1：观察缓存效果**
+- [ ] GET `/notes` 加日志，打印"查询数据库"
+- [ ] 第一次请求：打印日志，查数据库，结果存 Redis（TTL 60秒）
+- [ ] 第二次请求：不打印日志，直接从 Redis 取
+- [ ] redis-cli 看 key 存在，等 60 秒后消失
+
+**Task 6-2：缓存失效问题**
+- [ ] POST 一条新笔记后，GET 列表还是返回旧数据（缓存没更新）
+- [ ] 修复：写入后主动删除缓存 key
+- [ ] FBA 对照：搜 `redis_client.delete`，看企业在哪些地方清缓存
+
+**完成标准**：能演示缓存命中和缓存失效，能说出 Redis 缓存解决了什么问题。
+
+**踩坑记录**：
+
+---
+
+## 阶段 7：系统不再让用户等
+
+**你在系统的位置**：AI 摘要生成太慢，不能阻塞请求。
+
+**ainotes 这个阶段长出了什么**：
+- 创建笔记后触发 Celery 任务：模拟 AI 生成摘要（sleep 3秒）
+- 接口立刻返回，不等 AI 处理完
+- 摘要生成后写回数据库
+
+**目录结构（加了 Celery）**：
+```
+sandbox/ainotes/
+├── main.py
+├── database.py
+├── models.py
+├── schemas.py
+├── celery_app.py  # Celery 实例
+├── tasks.py       # Celery 任务定义
+└── routers/
+    ├── auth.py
+    └── notes.py
+```
+
+**任务清单**：
+
+**Task 7-1：没有异步任务会怎样**
+- [ ] 在 POST `/notes` 里加 `time.sleep(5)`，模拟 AI 处理
+- [ ] 用 Swagger 创建笔记，感受 5 秒等待
+- [ ] 思考：100 个用户同时创建笔记会怎样？
+
+**Task 7-2：Celery 异步处理**
+- [ ] 配置 Celery，broker 用 fba_rabbitmq，backend 用 fba_redis
+- [ ] 写 `generate_summary` task：sleep 3秒，写摘要回数据库
+- [ ] POST `/notes` 改为：存笔记 → 触发任务 → 立刻返回
+- [ ] 打开 `http://localhost:8555`（Flower），看任务流动
+
+**Task 7-3：FBA 对照**
+- [ ] 去 FBA 找 Celery 任务定义，看企业如何组织异步任务
+- [ ] 对比：你的 tasks.py 和 FBA 的任务组织有什么差距？
+
+**完成标准**：创建笔记立刻返回，3秒后 Navicat 里能看到摘要写入，能说出 Celery 解决了什么问题。
+
+**踩坑记录**：
+
+---
+
+## 阶段 8：AI 回答实时出现
+
+**你在系统的位置**：数据如何边生成边发送。
+
+**ainotes 这个阶段长出了什么**：
+- GET `/notes/{id}/summary/stream` 接口
+- SSE 流式返回摘要内容，逐字出现
+- 打字机效果
+
+**任务清单**：
+
+**Task 8-1：最小流式响应**
+- [ ] `StreamingResponse`，每 0.1 秒 yield 一个字
+- [ ] 浏览器访问，看到字一个个出现
+
+**Task 8-2：标准 SSE 格式**
+- [ ] 改造为 `data: {content}\n\n` 格式
+- [ ] 结束时发 `data: [DONE]\n\n`
+
+**Task 8-3：ainotes 的流式摘要**
+- [ ] GET `/notes/{id}/summary/stream`，从数据库取摘要，逐字流式返回
+- [ ] 理解：为什么 AI 项目里 SSE 是必须的，不是可选的
+
+**Task 8-4：FBA 对照**
+- [ ] 去 FBA 搜 `StreamingResponse`，看企业如何实现流式接口
+
+**完成标准**：浏览器访问流式接口，看到打字机效果，能说出 SSE 和普通接口的区别。
+
+**踩坑记录**：
+
+---
+
+## 阶段 9：企业对照实战
+
+**你在系统的位置**：你已经理解了整条链路，现在进入 FBA，加一个完整模块。
+
+**目标**：在 FBA 里新增"个人笔记"模块，按企业分层实现。
+
+**任务清单**：
+
+**Task 9-1：读懂一个已有模块**
+- [ ] 把 sys_user 的 model / schema / crud / service / api 全部读一遍
+- [ ] 能解释每一层的职责
+- [ ] 对比：ainotes 的写法 vs FBA 的写法，差距在哪里？
+
+**Task 9-2：在 FBA 里加"个人笔记"模块**
+- [ ] `backend/app/admin/notes/` 按企业分层实现
+- [ ] CRUD + 分页 + 权限
+- [ ] 注册到主路由，Swagger 测试
+
+**验收标准**：
+- [ ] 能画出登录请求的完整调用链
+- [ ] 能在 FBA 里找到任意 bug 并说出它在哪一层
+- [ ] 能独立加新接口不破坏现有功能
+
+---
+
+## 阶段总览
+
+| 阶段 | 系统层 | ainotes 长出了什么 | FBA 对照点 | 状态 |
+|------|--------|-------------------|-----------|------|
+| 0 | 整个系统 | — | Docker Compose 跑通 | ✅ |
+| 1 | 整条链路 | — | JWT + Redis 认证链 | ✅ |
+| 2 | 路由层 | 笔记 CRUD（内存） | 路由组织方式 | [ ] |
+| 3 | 入口校验 | Schema 校验 | Schema 分层 | [ ] |
+| 4 | 认证链 | JWT + Redis Session | 认证链实现 | [ ] |
+| 5 | 数据持久化 | PostgreSQL 存储 | model/crud/service 三层 | [ ] |
+| 6 | 缓存层 | Redis 缓存 | 缓存清理策略 | [ ] |
+| 7 | 异步任务 | Celery AI 摘要 | 任务组织方式 | [ ] |
+| 8 | 流式响应 | SSE 打字机 | StreamingResponse | [ ] |
+| 9 | 企业实战 | — | 在 FBA 加完整模块 | [ ] |
+
+*最后更新：2026-05-24*
