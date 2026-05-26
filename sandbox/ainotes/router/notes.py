@@ -18,6 +18,7 @@ async def create_item(note: NoteCreate):
         new_note = Note(title=note.title, content=note.content)
         session.add(new_note)
         await session.commit()
+        redis_client.delete("ainotes:notes:all")#创建新笔记后，删除缓存中的所有笔记，确保缓存与数据库保持一致。
         await session.refresh(new_note)
     return new_note
 

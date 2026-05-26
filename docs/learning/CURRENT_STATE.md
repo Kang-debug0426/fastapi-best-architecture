@@ -21,9 +21,10 @@ completed:
   - Redis session 调试完成（2026-05-25）
     - 登录写 key，访问验 key，退出删 key，同 token 再访问返回 401
 
-  - 阶段6: Redis 缓存进行中（2026-05-25）
+  - 阶段6: Redis 缓存完成（2026-05-25）
     - GET /notes 加缓存：先查 Redis，命中直接返回，未命中查库后写缓存 TTL 60s
-    - ainotes:notes:all key 写入验证成功
+    - POST /notes 写库后主动删缓存，保证数据一致性
+    - Cache-Aside 模式跑通验证
 
 pending_questions:
   - JWT + bcrypt + Header 认证这套只跟着敲会了，阶段5连真实数据库时需要结合场景重新讲清楚
