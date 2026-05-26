@@ -2,13 +2,11 @@
 from fastapi import Depends, APIRouter
 from sqlalchemy import text
 import json
-import redis
+from database import redis_client
 from database import AsyncSessionLocal
 from model import Note
 from schemas import NoteCreate, NoteResponse
 from router.auth import verify_token
-
-redis_client = redis.Redis(host="127.0.0.1", port=6379, db=0, decode_responses=True, password="cjk123")
 
 router = APIRouter()
 
